@@ -60,6 +60,8 @@ const [direccionEditada, setDireccionEditada] =
 
 const [tipoClienteEditado, setTipoClienteEditado] =
   useState("NV")
+const [nombreOriginal, setNombreOriginal] =
+  useState("")
 
 
 useEffect(() => {
@@ -133,16 +135,32 @@ async function guardarCliente(id: string) {
     return
   }
 
+  const { error: errorVentas } = await supabase
+    .from("Ventas")
+    .update({
+      Cliente_nombre: nombreEditado,
+      Giro: giroEditado,
+      Tipo_cliente: tipoClienteEditado
+    })
+    .eq("Cliente_nombre", nombreOriginal)
+
+  if (errorVentas) {
+    console.log(errorVentas)
+  }
+
   setClienteEditando(null)
 
   cargarDatos()
 }
-
 function editarCliente(cliente: any) {
 
   console.log("EDITANDO CLIENTE")
 
   setClienteEditando(cliente.id)
+
+  setNombreOriginal(
+    cliente.Nombre || ""
+  )
 
   setNombreEditado(
     cliente.Nombre || ""
@@ -163,7 +181,6 @@ function editarCliente(cliente: any) {
   setTipoClienteEditado(
     cliente.Tipo_cliente || "NV"
   )
-
 }
 
 async function eliminarCliente(id: string) {
@@ -598,7 +615,7 @@ async function actualizarEstado(
         <div className="grid grid-cols-2 gap-6 mb-10">
         <div className="bg-[#1a1d26] border border-gray-800 rounded-2xl p-8">
           <h3 className="text-3xl font-bold mb-8 flex items-center gap-3">
-            🔷 Nueva venta
+            🔷 Nueva venta 💙
          </h3>
 <div className="space-y-4">
 
