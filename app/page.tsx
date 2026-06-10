@@ -75,7 +75,18 @@ const [nuevaObservacion, setNuevaObservacion] = useState("")
 const [proveedorSeleccionado, setProveedorSeleccionado] =
   useState("")
 const [productoVenta, setProductoVenta] = useState("")
+const [gastos, setGastos] = useState<any[]>([])
 
+const [fechaGasto, setFechaGasto] = useState("")
+const [conceptoGasto, setConceptoGasto] = useState("")
+const [categoriaGasto, setCategoriaGasto] = useState("")
+const [proveedorGasto, setProveedorGasto] = useState("")
+const [subtotalGasto, setSubtotalGasto] = useState("")
+const [ivaGasto, setIvaGasto] = useState("")
+const [totalGasto, setTotalGasto] = useState("")
+const [facturaGasto, setFacturaGasto] = useState("")
+const [observacionesGasto, setObservacionesGasto] = useState("")
+const [gastoEditando, setGastoEditando] = useState<string | null>(null)
 
 useEffect(() => {
   cargarDatos()
@@ -89,6 +100,11 @@ async function cargarDatos() {
   const { data: productosData } = await supabase
     .from("Productos")
     .select("*")
+  
+  const { data: gastosData } = await supabase
+  .from("Gastos")
+  .select("*")
+  .order("Fecha", { ascending: false })
 
   const { data: proveedoresData } = await supabase
 .from("Proveedores")
@@ -107,6 +123,7 @@ console.log("VENTAS:", ventasData)
   setProductos(productosData || [])
   setVentas(ventasData || [])
   setProveedores(proveedoresData || [])
+  setGastos(gastosData || [])
 
   console.log("VENTAS GUARDADAS EN STATE:", ventasData)
   
@@ -598,6 +615,137 @@ async function agregarProveedorProducto() {
   cargarProveedoresProducto(
     productoSeleccionado.id
   )
+}
+
+async function cargarGastos() {
+
+  const { data, error } = await supabase
+    .from("Gastos")
+    .select("*")
+    .order("Fecha", { ascending: false })
+
+  if (error) {
+    console.log(error)
+    return
+  }
+
+  setGastos(data || [])
+}
+
+async function guardarGasto() {
+
+  const { error } = await supabase
+    .from("Gastos")
+    .insert([
+      {
+        Fecha: fechaGasto,
+        Concepto: conceptoGasto,
+        Categoria: categoriaGasto,
+        Proveedor: proveedorGasto,
+        Subtotal: Number(subtotalGasto),
+        IVA: Number(ivaGasto),
+        Total: Number(totalGasto),
+        Factura: facturaGasto,
+        Observaciones: observacionesGasto
+      }
+    ])
+
+  if (error) {
+    console.log(error)
+    return
+  }
+
+  setFechaGasto("")
+  setConceptoGasto("")
+  setCategoriaGasto("")
+  setProveedorGasto("")
+  setSubtotalGasto("")
+  setIvaGasto("")
+  setTotalGasto("")
+  setFacturaGasto("")
+  setObservacionesGasto("")
+
+  cargarGastos()
+}
+
+async function eliminarGasto(id: string) {
+
+  const confirmar = confirm(
+    "¿Eliminar este gasto?"
+  )
+
+  if (!confirmar) return
+
+  const { error } = await supabase
+    .from("Gastos")
+    .delete()
+    .eq("id", id)
+
+  if (error) {
+    console.log(error)
+    return
+  }
+
+  cargarDatos()
+}
+
+function editarGasto(gasto: any) {
+
+  setGastoEditando(gasto.id)
+
+  setFechaGasto(gasto.Fecha || "")
+  setConceptoGasto(gasto.Concepto || "")
+  setCategoriaGasto(gasto.Categoria || "")
+  setProveedorGasto(gasto.Proveedor || "")
+  setSubtotalGasto(String(gasto.Subtotal || ""))
+  setIvaGasto(String(gasto.IVA || ""))
+  setTotalGasto(String(gasto.Total || ""))
+  setFacturaGasto(gasto.Factura || "")
+  setObservacionesGasto(gasto.Observaciones || "")
+}
+
+async function actualizarGasto() {
+
+  if (!gastoEditando) return
+
+  const { error } = await supabase
+    .from("Gastos")
+    .update({
+      Fecha: fechaGasto,
+      Concepto: conceptoGasto,
+      Categoria: categoriaGasto,
+      Proveedor: proveedorGasto,
+      Subtotal: Number(subtotalGasto),
+      IVA: Number(ivaGasto),
+      Total: Number(totalGasto),
+      Factura: facturaGasto,
+      Observaciones: observacionesGasto
+    })
+    .eq("id", gastoEditando)
+
+  if (error) {
+    console.log(error)
+    return
+  }
+
+  limpiarFormularioGasto()
+
+  cargarDatos()
+}
+
+function limpiarFormularioGasto() {
+
+  setGastoEditando(null)
+
+  setFechaGasto("")
+  setConceptoGasto("")
+  setCategoriaGasto("")
+  setProveedorGasto("")
+  setSubtotalGasto("")
+  setIvaGasto("")
+  setTotalGasto("")
+  setFacturaGasto("")
+  setObservacionesGasto("")
 }
 
 
@@ -1854,6 +2002,174 @@ async function agregarProveedorProducto() {
       </>
 
     )}
+
+  </div>
+
+</div>
+
+)}
+
+{vista === "gastos" && (
+
+<div>
+
+  <h1 className="text-4xl font-bold mb-8">
+    Gastos
+  </h1>
+
+  <div className="bg-[#1a1d26] p-6 rounded-2xl mb-8">
+
+    <div className="grid grid-cols-4 gap-4 mb-4">
+
+      <input
+        type="date"
+        value={fechaGasto}
+        onChange={(e) => setFechaGasto(e.target.value)}
+        className="bg-[#111827] p-3 rounded-xl"
+      />
+
+      <input
+        placeholder="Concepto"
+        value={conceptoGasto}
+        onChange={(e) => setConceptoGasto(e.target.value)}
+        className="bg-[#111827] p-3 rounded-xl"
+      />
+
+      <input
+        placeholder="Categoría"
+        value={categoriaGasto}
+        onChange={(e) => setCategoriaGasto(e.target.value)}
+        className="bg-[#111827] p-3 rounded-xl"
+      />
+
+      <input
+        placeholder="Proveedor"
+        value={proveedorGasto}
+        onChange={(e) => setProveedorGasto(e.target.value)}
+        className="bg-[#111827] p-3 rounded-xl"
+      />
+
+    </div>
+
+    <div className="grid grid-cols-4 gap-4 mb-4">
+
+      <input
+        placeholder="Subtotal"
+        value={subtotalGasto}
+        onChange={(e) => setSubtotalGasto(e.target.value)}
+        className="bg-[#111827] p-3 rounded-xl"
+      />
+
+      <input
+        placeholder="IVA"
+        value={ivaGasto}
+        onChange={(e) => setIvaGasto(e.target.value)}
+        className="bg-[#111827] p-3 rounded-xl"
+      />
+
+      <input
+        placeholder="Total"
+        value={totalGasto}
+        onChange={(e) => setTotalGasto(e.target.value)}
+        className="bg-[#111827] p-3 rounded-xl"
+      />
+
+      <input
+        placeholder="Factura"
+        value={facturaGasto}
+        onChange={(e) => setFacturaGasto(e.target.value)}
+        className="bg-[#111827] p-3 rounded-xl"
+      />
+
+    </div>
+
+    <textarea
+      placeholder="Observaciones"
+      value={observacionesGasto}
+      onChange={(e) =>
+        setObservacionesGasto(e.target.value)
+      }
+      className="bg-[#111827] p-3 rounded-xl w-full mb-4"
+    />
+
+    <button
+  onClick={
+    gastoEditando
+      ? actualizarGasto
+      : guardarGasto
+  }
+  className="bg-cyan-500 px-6 py-3 rounded-xl"
+>
+  {gastoEditando
+    ? "Actualizar gasto"
+    : "Guardar gasto"}
+</button>
+
+  </div>
+
+  <div className="bg-[#1a1d26] rounded-2xl p-6">
+
+    <table className="w-full">
+
+      <thead>
+
+        <tr className="border-b border-gray-700">
+
+          <th className="text-left p-3">Fecha</th>
+          <th className="text-left p-3">Concepto</th>
+          <th className="text-left p-3">Categoría</th>
+          <th className="text-left p-3">Proveedor</th>
+          <th className="text-left p-3">Total</th>
+          <th className="text-center p-3">Acciones</th>
+
+        </tr>
+
+      </thead>
+
+      <tbody>
+
+        {gastos.map((gasto) => (
+
+          <tr
+            key={gasto.id}
+            className="border-b border-gray-800"
+          >
+
+            <td className="p-3">{gasto.Fecha}</td>
+            <td className="p-3">{gasto.Concepto}</td>
+            <td className="p-3">{gasto.Categoria}</td>
+            <td className="p-3">{gasto.Proveedor}</td>
+            <td className="p-3">
+              ${Number(gasto.Total).toLocaleString()}
+            </td>
+            
+            <td className="p-3">
+             <div className="flex gap-2 justify-center">
+
+              <button
+               onClick={() => editarGasto(gasto)}
+               className="bg-blue-500 hover:bg-blue-600 px-3 py-2 rounded-lg"
+              >
+               ✏️
+              </button>
+
+              <button
+               onClick={() => eliminarGasto(gasto.id)}
+               className="bg-red-500 hover:bg-red-600 px-3 py-2 rounded-lg"
+              >
+              🗑️
+              </button>
+
+  </div>
+</td>
+
+          </tr>
+
+        ))}
+
+      </tbody>
+
+    </table>
 
   </div>
 
