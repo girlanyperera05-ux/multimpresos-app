@@ -2,11 +2,13 @@
 import { useState, useEffect } from "react"
 import {
   LayoutDashboard,
-  Users,
   ShoppingCart,
-  DollarSign,
   ClipboardList,
-  CalendarDays,
+  Users,
+  DollarSign,
+  Package,
+  Truck,
+  Receipt
 } from "lucide-react"
 
 import { supabase } from "@/app/lib/supabase"
@@ -14,7 +16,7 @@ export default function Home() {
 const [clientes, setClientes] = useState<any[]>([])
 const [productos, setProductos] = useState<any[]>([])
 const [clienteSeleccionado, setClienteSeleccionado] = useState("")
-const [productoSeleccionado, setProductoSeleccionado] = useState("")
+const [productoSeleccionado, setProductoSeleccionado] = useState<any>(null)
 const [monto, setMonto] = useState("")
 const [anticipo, setAnticipo] = useState("")
 const [requiereFactura, setRequiereFactura] = useState(false)
@@ -62,6 +64,17 @@ const [tipoClienteEditado, setTipoClienteEditado] =
   useState("NV")
 const [nombreOriginal, setNombreOriginal] =
   useState("")
+
+const [proveedoresProducto, setProveedoresProducto] = useState<any[]>([])
+
+
+const [nuevoProducto, setNuevoProducto] = useState("")
+const [nuevoPrecio, setNuevoPrecio] = useState("")
+const [nuevaObservacion, setNuevaObservacion] = useState("")
+
+const [proveedorSeleccionado, setProveedorSeleccionado] =
+  useState("")
+const [productoVenta, setProductoVenta] = useState("")
 
 
 useEffect(() => {
@@ -466,7 +479,7 @@ async function actualizarEstado(
 
 }
   
- async function actualizarProveedorVenta(
+async function actualizarProveedorVenta(
   id: string,
   proveedor: string
 ) {
@@ -487,6 +500,105 @@ async function actualizarEstado(
 
 }
 
+async function cargarProductos() {
+
+  const { data, error } = await supabase
+    .from("Productos")
+    .select("*")
+    .order("Nombre")
+
+  if (error) {
+    console.log(error)
+    return
+  }
+
+  setProductos(data || [])
+}
+
+async function cargarProveedores() {
+
+  const { data, error } = await supabase
+    .from("Proveedores")
+    .select("*")
+    .order("Nombre")
+
+  if (error) {
+    console.log(error)
+    return
+  }
+
+  setProveedores(data || [])
+}
+
+async function cargarProveedoresProducto(
+  productoId: number
+) {
+
+  const { data, error } = await supabase
+    .from("Producto_Proveedor")
+    .select("*")
+    .eq("Producto_id", productoId)
+
+  if (error) {
+    console.log(error)
+    return
+  }
+
+  setProveedoresProducto(data || [])
+}
+
+async function agregarProducto() {
+
+  if (!nuevoProducto) return
+
+  const { error } = await supabase
+    .from("Productos")
+    .insert([
+      {
+        Nombre: nuevoProducto
+      }
+    ])
+
+  if (error) {
+    console.log(error)
+    return
+  }
+
+  setNuevoProducto("")
+
+  cargarProductos()
+}
+
+async function agregarProveedorProducto() {
+
+  if (!productoSeleccionado) return
+
+  if (!proveedorSeleccionado) return
+
+  const { error } = await supabase
+    .from("Producto_Proveedor")
+    .insert([
+      {
+        Producto_id: productoSeleccionado.id,
+        Proveedor_id: proveedorSeleccionado,
+        Precio: Number(nuevoPrecio),
+        Observacion: nuevaObservacion
+      }
+    ])
+
+  if (error) {
+    console.log(error)
+    return
+  }
+
+  setNuevoPrecio("")
+  setNuevaObservacion("")
+  setProveedorSeleccionado("")
+
+  cargarProveedoresProducto(
+    productoSeleccionado.id
+  )
+}
 
 
   return (
@@ -537,7 +649,7 @@ async function actualizarEstado(
            onClick={() => setVista("productos")}
            className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 cursor-pointer"
           >
-           <DollarSign size={20} />
+           <Package size={20} />
            <span>Productos</span>
           </div>
 
@@ -545,10 +657,17 @@ async function actualizarEstado(
            onClick={() => setVista("proveedores")}
            className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 cursor-pointer"
           >
-           <DollarSign size={20} />
+           <Truck size={20} />
            <span>Proveedores</span>
           </div>
-
+          
+          <div
+            onClick={() => setVista("gastos")}
+           className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 cursor-pointer"
+         >
+            <Receipt size={20} />
+           <span>Gastos</span>
+          </div>
         </nav>
 
       </aside>
@@ -725,7 +844,7 @@ async function actualizarEstado(
 <div className="grid grid-cols-2 gap-4 mb-4">
 
   <select
-    value={productoSeleccionado}
+    value={productoVenta}
     onChange={(e) =>
       setProductoSeleccionado(e.target.value)
     }
@@ -1578,7 +1697,167 @@ async function actualizarEstado(
 )}
 
 {vista === "productos" && (
-  <h1 className="text-4xl font-bold">Productos</h1>
+
+<div className="grid grid-cols-2 gap-6 mt-6">
+
+  <div className="bg-[#0f172a] p-6 rounded-xl">
+
+    <h2 className="text-2xl font-bold mb-4">
+      Productos
+    </h2>
+
+    <div className="flex gap-2 mb-4">
+
+      <input
+        value={nuevoProducto}
+        onChange={(e) =>
+          setNuevoProducto(e.target.value)
+        }
+        placeholder="Nuevo producto"
+        className="bg-black border border-gray-700 p-2 rounded flex-1"
+      />
+
+      <button
+        onClick={agregarProducto}
+        className="bg-cyan-500 text-black px-4 rounded"
+      >
+        +
+      </button>
+
+    </div>
+
+    <div className="space-y-2">
+
+      {productos.map((producto) => (
+
+        <div
+          key={producto.id}
+          onClick={() => {
+
+            setProductoSeleccionado(producto)
+
+            cargarProveedoresProducto(
+              producto.id
+            )
+
+          }}
+          className="p-3 rounded bg-[#1e293b] cursor-pointer hover:bg-gray-900"
+        >
+
+          {producto.Nombre}
+
+        </div>
+
+      ))}
+
+    </div>
+
+  </div>
+
+  <div className="bg-[#0f172a] p-6 rounded-xl">
+
+    <h2 className="text-2xl font-bold mb-4">
+
+      {productoSeleccionado
+        ? `Proveedores de ${productoSeleccionado.Nombre}`
+        : "Selecciona un producto"}
+
+    </h2>
+
+    {productoSeleccionado && (
+
+      <>
+
+        <div className="flex gap-2 mb-4">
+
+          <select
+            value={proveedorSeleccionado}
+            onChange={(e) =>
+              setProveedorSeleccionado(
+                e.target.value
+              )
+            }
+            className="bg-black border border-gray-700 p-2 rounded flex-1"
+          >
+
+            <option value="">
+              Seleccionar proveedor
+            </option>
+
+            {proveedores.map((p) => (
+
+              <option
+                key={p.id}
+                value={p.id}
+              >
+                {p.Nombre}
+              </option>
+
+            ))}
+
+          </select>
+
+          <input
+            type="number"
+            value={nuevoPrecio}
+            onChange={(e) =>
+              setNuevoPrecio(e.target.value)
+            }
+            placeholder="Precio"
+            className="bg-black border border-gray-700 p-2 rounded w-32"
+          />
+          
+          <input
+           value={nuevaObservacion}
+           onChange={(e) =>
+             setNuevaObservacion(e.target.value)
+           }
+            placeholder="Observación"
+           className="bg-[#111827] border border-gray-700 rounded-xl p-3"
+          />
+
+          <button
+            onClick={agregarProveedorProducto}
+            className="bg-green-600 px-4 rounded"
+          >
+            +
+          </button>
+
+        </div>
+
+        <div className="space-y-2">
+
+          {proveedoresProducto.map((item) => (
+
+            <div
+              key={item.id}
+              className="bg-black p-3 rounded flex justify-between"
+            >
+
+              <span>
+                {item.Proveedor_id}
+              </span>
+
+              <span>
+                ${item.Precio}
+              </span>
+
+              <div className="text-gray-400 text-sm mt-2">
+               {item.Observacion}
+            </div>
+            </div>
+
+          ))}
+
+        </div>
+
+      </>
+
+    )}
+
+  </div>
+
+</div>
 
 )}
 
