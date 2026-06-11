@@ -84,10 +84,32 @@ const [proveedorGasto, setProveedorGasto] = useState("")
 const [subtotalGasto, setSubtotalGasto] = useState("")
 const [ivaGasto, setIvaGasto] = useState("")
 const [totalGasto, setTotalGasto] = useState("")
-const [facturaGasto, setFacturaGasto] = useState("")
+const [facturaGasto, setFacturaGasto] =
+  useState(false)
 const [observacionesGasto, setObservacionesGasto] = useState("")
 const [gastoEditando, setGastoEditando] = useState<string | null>(null)
 
+const estadosProduccion = [
+  "Por hacer",
+  "Diseño",
+  "Aprobado",
+  "A imprenta",
+  "En producción",
+  "Por recoger",
+  "Acabados",
+  "Listo",
+  "Entregado"
+]
+
+const [observacionVisible, setObservacionVisible] =
+  useState("")
+
+const [mostrarObservacion, setMostrarObservacion] =
+  useState(false)
+
+const [costoEditado, setCostoEditado] =
+  useState("")
+  
 useEffect(() => {
   cargarDatos()
 }, [])
@@ -662,7 +684,7 @@ async function guardarGasto() {
   setSubtotalGasto("")
   setIvaGasto("")
   setTotalGasto("")
-  setFacturaGasto("")
+  setFacturaGasto(false)
   setObservacionesGasto("")
 
   cargarGastos()
@@ -744,10 +766,29 @@ function limpiarFormularioGasto() {
   setSubtotalGasto("")
   setIvaGasto("")
   setTotalGasto("")
-  setFacturaGasto("")
+  setFacturaGasto(false)
   setObservacionesGasto("")
 }
 
+async function actualizarCosto(
+  id: string,
+  costo: string
+) {
+
+  const { error } = await supabase
+    .from("Ventas")
+    .update({
+      Costo: Number(costo)
+    })
+    .eq("id", id)
+
+  if (error) {
+    console.log(error)
+    return
+  }
+
+  cargarDatos()
+}
 
   return (
     <main className="flex min-h-screen bg-[#0f1117] text-white">
@@ -1210,6 +1251,8 @@ function limpiarFormularioGasto() {
          <th className="p-4">Cliente</th>
          <th className="p-4">Giro</th>
          <th className="p-4">Producto</th>
+         <th className="p-4">Costo</th>
+         <th className="p-4">Utilidad</th>
          <th className="p-4">Total</th>
          <th className="p-4">Anticipo</th>
          <th className="p-4">Saldo</th>
@@ -1262,6 +1305,40 @@ function limpiarFormularioGasto() {
 
 <td className="p-4">
   {venta.Producto_nombre}
+</td>
+
+<td className="p-4">
+
+  <input
+    type="number"
+    defaultValue={venta.Costo || ""}
+    onBlur={(e) =>
+      actualizarCosto(
+        venta.id,
+        e.target.value
+      )
+    }
+    className="
+      bg-[#111827]
+      border
+      border-gray-700
+      rounded
+      px-2
+      py-1
+      w-24
+    "
+  />
+
+</td>
+
+<td className="p-4 text-green-400 font-bold">
+
+  ${
+    (Number(venta.Total) || 0)
+    -
+    (Number(venta.Costo) || 0)
+  }
+
 </td>
 
 <td className="p-4">
@@ -1421,15 +1498,26 @@ function limpiarFormularioGasto() {
           <tr className="border-b border-gray-700 text-left">
             <th className="p-4">Cliente</th>
             <th className="p-4">Producto</th>
-            <th className="p-4">Observaciones</th>
-            <th className="p-4">Estado</th>
+            <th className="p-4 text-center">Obs</th>
+            {estadosProduccion.map((estado) => (
+              <th
+               key={estado}
+               className="p-2 text-center text-xs"
+              >
+               {estado}
+              </th>
+            ))}
             <th className="p-4">Proveedor</th>
           </tr>
         </thead>
 
         <tbody>
-          {ventas.map((venta) => (
-            <tr
+          {ventas
+  .filter(
+    (venta) => venta.Estado_pedido !== "Entregado"
+  )
+  .map((venta) => (
+      <tr
               key={venta.id}
               className="border-b border-gray-800"
             >
@@ -1441,35 +1529,96 @@ function limpiarFormularioGasto() {
                 {venta.Producto_nombre}
               </td>
 
-              <td className="p-4">
-                {venta.Observaciones}
+              <td className="p-4 text-center">
+               <button
+  onClick={() => {
+    setObservacionVisible(
+      venta.Observaciones || ""
+    )
+
+    setMostrarObservacion(true)
+  }}
+  className="
+    bg-cyan-500/20
+    hover:bg-cyan-500/40
+    px-3
+    py-1
+    rounded-lg
+  "
+>
+  👁️
+</button>
               </td>
 
-              <td className="p-4">
-              <select
-                value={venta.Estado_pedido}
-               onChange={(e) => {
-               console.log("ID:", venta.id)
-               console.log("ESTADO NUEVO:", e.target.value)
+              {estadosProduccion.map((estado) => {
 
-               actualizarEstado(
-                venta.id,
-                e.target.value
-             )
-           }}
-                className="bg-[#111827] border border-gray-700 rounded-lg px-3 py-1"
-             >
-               <option>Por hacer</option>
-               <option>Diseño</option>
-               <option>Aprobado</option>
-               <option>A imprenta</option>
-               <option>En producción</option>
-               <option>Por recoger</option>
-               <option>Listo para entrega</option>
-               <option>Entregado</option>
-             </select>
+  const estadoActual =
+    estadosProduccion.indexOf(
+      venta.Estado_pedido
+    )
 
-             </td>
+  const estadoCelda =
+    estadosProduccion.indexOf(
+      estado
+    )
+
+  const completado =
+    estadoCelda <= estadoActual
+
+  return (
+    <td
+      key={estado}
+      className="text-center"
+    >
+      <button
+        onClick={() =>
+          actualizarEstado(
+            venta.id,
+            estado
+          )
+        }
+        className="
+          w-8
+          h-8
+          rounded-full
+          text-lg
+        "
+      >
+        <div
+  className={`
+    w-10 h-10 rounded-full mx-auto
+    flex items-center justify-center
+    text-white font-bold
+    ${
+      completado
+        ? estado === "Diseño"
+          ? "bg-purple-500"
+          : estado === "Aprobado"
+          ? "bg-blue-500"
+          : estado === "A imprenta"
+          ? "bg-orange-500"
+          : estado === "En producción"
+          ? "bg-yellow-500 text-black"
+          : estado === "Acabados"
+          ? "bg-green-500"
+          : estado === "Por recoger"
+          ? "bg-pink-500"
+          : estado === "Listo"
+          ? "bg-cyan-500"
+          : estado === "Entregado"
+          ? "bg-green-700"         
+          : "bg-gray-500"
+        : "border-2 border-gray-500"
+    }
+  `}
+>
+  {completado ? "✓" : ""}
+</div>
+      </button>
+    </td>
+  )
+
+})}
 
               <td className="p-4">
 
@@ -1504,6 +1653,55 @@ function limpiarFormularioGasto() {
           ))}
         </tbody>
       </table>
+    </div>
+  </div>
+  
+)}
+
+{mostrarObservacion && (
+  <div
+    className="
+      fixed
+      inset-0
+      bg-black/70
+      flex
+      items-center
+      justify-center
+      z-50
+    "
+  >
+    <div
+      className="
+        bg-[#111827]
+        p-6
+        rounded-2xl
+        w-[500px]
+        border
+        border-gray-700
+      "
+    >
+      <h2 className="text-xl font-bold mb-4">
+        Observaciones
+      </h2>
+
+      <div className="whitespace-pre-wrap mb-6">
+        {observacionVisible}
+      </div>
+
+      <button
+        onClick={() =>
+          setMostrarObservacion(false)
+        }
+        className="
+          bg-cyan-500
+          px-4
+          py-2
+          rounded-lg
+        "
+      >
+        Cerrar
+      </button>
+
     </div>
   </div>
 )}
@@ -2074,12 +2272,20 @@ function limpiarFormularioGasto() {
         className="bg-[#111827] p-3 rounded-xl"
       />
 
-      <input
-        placeholder="Factura"
-        value={facturaGasto}
-        onChange={(e) => setFacturaGasto(e.target.value)}
-        className="bg-[#111827] p-3 rounded-xl"
-      />
+      <div className="flex items-center gap-3 bg-[#111827] p-3 rounded-xl">
+
+  <input
+    type="checkbox"
+    checked={facturaGasto}
+    onChange={(e) =>
+      setFacturaGasto(e.target.checked)
+    }
+    className="w-5 h-5"
+  />
+
+  <span>Tiene factura</span>
+
+</div>
 
     </div>
 
@@ -2119,7 +2325,10 @@ function limpiarFormularioGasto() {
           <th className="text-left p-3">Concepto</th>
           <th className="text-left p-3">Categoría</th>
           <th className="text-left p-3">Proveedor</th>
+          <th className="text-left p-3">Subtotal</th>
+          <th className="text-left p-3">IVA</th>
           <th className="text-left p-3">Total</th>
+          <th className="text-left p-3">Factura</th>
           <th className="text-center p-3">Acciones</th>
 
         </tr>
@@ -2140,9 +2349,54 @@ function limpiarFormularioGasto() {
             <td className="p-3">{gasto.Categoria}</td>
             <td className="p-3">{gasto.Proveedor}</td>
             <td className="p-3">
+  ${Number(gasto.Subtotal).toLocaleString()}
+</td>
+
+<td className="p-3">
+  ${Number(gasto.IVA).toLocaleString()}
+</td>
+            <td className="p-3">
               ${Number(gasto.Total).toLocaleString()}
             </td>
             
+            <td className="p-3 text-center">
+
+  {gasto.Factura ? (
+
+    <div
+      className="
+        w-7
+        h-7
+        bg-green-500
+        rounded
+        flex
+        items-center
+        justify-center
+        mx-auto
+        text-white
+        font-bold
+      "
+    >
+      ✓
+    </div>
+
+  ) : (
+
+    <div
+      className="
+        w-7
+        h-7
+        border-2
+        border-gray-500
+        rounded
+        mx-auto
+      "
+    />
+
+  )}
+
+</td>
+
             <td className="p-3">
              <div className="flex gap-2 justify-center">
 
