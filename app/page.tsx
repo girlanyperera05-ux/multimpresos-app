@@ -17,8 +17,8 @@ const [clientes, setClientes] = useState<any[]>([])
 const [productos, setProductos] = useState<any[]>([])
 const [clienteSeleccionado, setClienteSeleccionado] = useState("")
 const [productoSeleccionado, setProductoSeleccionado] = useState<any>(null)
+const [fechaVenta, setFechaVenta] = useState("")
 const [monto, setMonto] = useState("")
-const [anticipo, setAnticipo] = useState("")
 const [requiereFactura, setRequiereFactura] = useState(false)
 const [tipoCliente, setTipoCliente] = useState("NV")
 const [estadoPago, setEstadoPago] = useState("Pendiente")
@@ -35,8 +35,6 @@ const [observacionesProveedor, setObservacionesProveedor] = useState("")
 const [proveedorEditando, setProveedorEditando] = useState<string | null>(null)
 const [nombreCliente, setNombreCliente] = useState("")
 const [telefonoCliente, setTelefonoCliente] = useState("")
-const saldo =
-  Number(monto || 0) - Number(anticipo || 0)
 const [ventaEditando, setVentaEditando] =
   useState<string | null>(null)
   const [anticipoEditado, setAnticipoEditado] =
@@ -75,6 +73,24 @@ const [nuevaObservacion, setNuevaObservacion] = useState("")
 const [proveedorSeleccionado, setProveedorSeleccionado] =
   useState("")
 const [productoVenta, setProductoVenta] = useState("")
+const [detalleVenta, setDetalleVenta] = useState<any[]>([])
+const totalPedido = detalleVenta.reduce(
+  (total, item) =>
+    total + Number(item.precio || 0),
+  0
+)
+
+const [descripcionDetalle, setDescripcionDetalle] =
+  useState("")
+
+const [cantidadDetalle, setCantidadDetalle] =
+  useState("")
+
+const [precioDetalle, setPrecioDetalle] =
+  useState("")
+
+const [proveedorDetalle, setProveedorDetalle] =
+  useState("")
 const [gastos, setGastos] = useState<any[]>([])
 
 const [fechaGasto, setFechaGasto] = useState("")
@@ -88,7 +104,7 @@ const [facturaGasto, setFacturaGasto] =
   useState(false)
 const [observacionesGasto, setObservacionesGasto] = useState("")
 const [gastoEditando, setGastoEditando] = useState<string | null>(null)
-
+const [anticipo, setAnticipo] = useState(0);
 const estadosProduccion = [
   "Por hacer",
   "Diseño",
@@ -109,9 +125,16 @@ const [mostrarObservacion, setMostrarObservacion] =
 
 const [costoEditado, setCostoEditado] =
   useState("")
-  
+
+const [pendientesTexto, setPendientesTexto] =
+  useState("")
+
+const [pendienteId, setPendienteId] =
+  useState<number | null>(null)
+
 useEffect(() => {
   cargarDatos()
+  cargarPendientes()
 }, [])
 
 async function cargarDatos() {
@@ -306,18 +329,25 @@ if (clienteSeleccionado === "nuevo") {
  console.log("PRODUCTO SELECCIONADO:", productoSeleccionado)
  console.log("PRODUCTO ENCONTRADO:", producto)
  console.log("TODOS LOS PRODUCTOS:", productos)
+ console.log("MONTO:", monto)
+ console.log("TOTAL PEDIDO:", totalPedido)
+ console.log("ANTICIPO:", anticipo)
+ console.log("DETALLE VENTA:", detalleVenta)
 
  const { error } = await supabase
   .from("Ventas")
+  
     .insert([
       {
         Cliente_id: clienteId,
       Cliente_nombre: clienteNombre,
-      Producto_nombre: producto?.Nombre,
+      Producto_nombre: detalleVenta
+      .map(item => item.descripcion)
+     .join(", "),
 
-      Total: Number(monto),
+      Total: Number(totalPedido),
       Anticipo: Number(anticipo),
-      Saldo: Number(monto) - Number(anticipo),
+      Saldo: Number(totalPedido) - Number(anticipo),
 
       Estado_pago: estadoPago,
       Estado_pedido: "Por hacer",
@@ -339,6 +369,32 @@ if (clienteSeleccionado === "nuevo") {
   alert("Venta guardada correctamente")
   cargarDatos()
 }
+
+function agregarDetalle() {
+
+  if (
+    !descripcionDetalle ||
+    !cantidadDetalle ||
+    !precioDetalle
+  ) return
+
+  setDetalleVenta([
+    ...detalleVenta,
+    {
+      descripcion: descripcionDetalle,
+      cantidad: cantidadDetalle,
+      precio: precioDetalle,
+      proveedor: proveedorDetalle,
+      estado: "Por hacer"
+    }
+  ])
+
+  setDescripcionDetalle("")
+  setCantidadDetalle("")
+  setPrecioDetalle("")
+  setProveedorDetalle("")
+}
+
 async function guardarProveedor() {
   const { error } = await supabase
     .from("Proveedores")
@@ -770,6 +826,48 @@ function limpiarFormularioGasto() {
   setObservacionesGasto("")
 }
 
+async function cargarPendientes() {
+
+  const { data, error } = await supabase
+    .from("Pendientes")
+    .select("*")
+    .limit(1)
+
+  if (error) {
+    console.log(error)
+    return
+  }
+
+  if (data && data.length > 0) {
+
+    setPendienteId(data[0].id)
+
+    setPendientesTexto(
+      data[0].Pendientes || ""
+    )
+
+  }
+
+}
+
+async function guardarPendientes() {
+
+  if (!pendienteId) return
+
+  const { error } = await supabase
+    .from("Pendientes")
+    .update({
+      Pendientes: pendientesTexto
+    })
+    .eq("id", pendienteId)
+
+  if (error) {
+    console.log(error)
+    return
+  }
+
+}
+
 async function actualizarCosto(
   id: string,
   costo: string
@@ -788,6 +886,9 @@ async function actualizarCosto(
   }
 
   cargarDatos()
+
+  const [fechaVenta, setFechaVenta] = useState("")
+
 }
 
   return (
@@ -882,42 +983,79 @@ async function actualizarCosto(
         </div>
 
         {/* Cards */}
-        <div className="grid grid-cols-3 gap-6 mb-10">
+        <div className="grid grid-cols-3 gap-6 mb-8">
 
-          <div className="bg-[#1a1d26] p-6 rounded-2xl border border-gray-800">
-            <p className="text-gray-400 mb-3">
-              Ventas del mes
-            </p>
+          <div className="bg-[#1a1d26] p-4 rounded-2xl border border-gray-800 h-44 flex flex-col justify-center">
+            <h3 className="text-lg text-gray-400 mb-2">
+             Ventas del mes
+           </h3>
 
-            <div className="flex items-center gap-3">
-              <DollarSign className="text-cyan-400" />
-              <h3 className="text-3xl font-bold">
+           <div className="flex items-center gap-3">
+             <DollarSign
+               size={32}
+               className="text-cyan-400"
+             />
+
+              <h3 className="text-4xl font-bold">
                {"$" + ventasDelMes.toLocaleString()}
               </h3>
             </div>
           </div>
 
-          <div className="bg-[#1a1d26] p-6 rounded-2xl border border-gray-800">
-            <p className="text-gray-400 mb-3">
+          <div className="bg-[#1a1d26] p-4 rounded-2xl border border-gray-800 h-44 flex flex-col justify-center">
+            <h3 className="text-lg text-gray-400 mb-2">
               Pedidos del mes
-            </p>
+            </h3>
 
             <h3 className="text-3xl font-bold">
              {pedidosDelMes}
             </h3>
           </div>
 
-          <div className="bg-[#1a1d26] p-6 rounded-2xl border border-gray-800">
-            <p className="text-gray-400 mb-3">
-              Trabajos activos
-            </p>
+         
+          <div className="bg-[#1a1d26] p-6 rounded-2xl border border-gray-800 mb-8">
 
-            <h3 className="text-3xl font-bold">
-              {trabajosActivos}
-            </h3>
-          </div>
+             <div className="flex justify-between items-center mb-4">
+
+             <h2 className="text-2xl font-bold">
+               📝 Pendientes
+              </h2>
+
+              <button
+                onClick={guardarPendientes}
+                className="
+                  bg-cyan-500
+                  hover:bg-cyan-600
+                  px-4
+                  py-2
+                  rounded-lg
+                  "
+                >
+               Guardar
+              </button>
+
+         </div>
+
+         <textarea
+           value={pendientesTexto}
+          onChange={(e) =>
+          setPendientesTexto(e.target.value)
+             }
+               className="
+               w-full
+               h-20
+               bg-[#111827]
+               border
+               border-gray-700
+               rounded-xl
+               p-3
+               resize-none
+                "
+             />
 
         </div>
+
+      </div>
 
         {/* Formulario */}
         <div className="grid grid-cols-2 gap-6 mb-10">
@@ -927,7 +1065,7 @@ async function actualizarCosto(
          </h3>
 <div className="space-y-4">
 
-  <div className="grid grid-cols-2 gap-4 mb-4">
+ <div className="grid grid-cols-3 gap-4 mb-4">
 
   <div>
     <label className="block text-sm text-gray-300 mb-2">
@@ -986,9 +1124,23 @@ async function actualizarCosto(
     </select>
   </div>
 
-</div>
+<div className="mb-4">
 
-  
+  <label className="block text-sm text-gray-300 mb-2">
+    Fecha de venta
+  </label>
+
+  <input
+    type="date"
+    value={fechaVenta}
+    onChange={(e) =>
+      setFechaVenta(e.target.value)
+    }
+    className="bg-[#111827] border border-gray-700 rounded-xl p-4 w-full"
+  />
+
+</div> 
+</div>
 
 <div className="grid grid-cols-2 gap-4 mb-2">
   <label className="text-sm text-gray-300">
@@ -1018,78 +1170,160 @@ async function actualizarCosto(
 
 </div>
 
-<div className="grid grid-cols-2 gap-4 mb-2">
+<div className="mb-6">
 
-  <label className="text-sm text-gray-300">
-    Producto
-  </label>
+  <h3 className="font-bold text-lg mb-3">
+    Productos del pedido
+  </h3>
 
-  <label className="text-sm text-gray-300">
-    Total
-  </label>
+ <div className="grid grid-cols-4 gap-3 mb-2 text-sm text-gray-400 font-semibold">
 
-</div>
+  <div>Producto</div>
 
-<div className="grid grid-cols-2 gap-4 mb-4">
+  <div>Cantidad</div>
 
-  <select
-    value={productoVenta}
-    onChange={(e) =>
-      setProductoSeleccionado(e.target.value)
-    }
-    className="bg-[#111827] border border-gray-700 rounded-xl p-4"
-  >
-    <option value="">
-      Seleccionar Producto
+  <div>Precio</div>
+
+  <div>Acción</div>
+
+  </div>
+
+  <div className="grid grid-cols-4 gap-3">
+
+    <select
+  value={descripcionDetalle}
+  onChange={(e) =>
+    setDescripcionDetalle(e.target.value)
+  }
+  className="bg-[#111827] p-3 rounded-xl"
+>
+  <option value="">
+    Seleccionar producto
+  </option>
+
+  {productos?.map((producto) => (
+    <option
+      key={producto.id}
+      value={producto.Nombre}
+    >
+      {producto.Nombre}
     </option>
+  ))}
+</select>
 
-    {productos?.map((producto) => (
-      <option
-        key={producto.id}
-        value={producto.id}
-      >
-        {producto.Nombre}
-      </option>
-    ))}
-  </select>
+    <input
+      placeholder="Cantidad"
+      value={cantidadDetalle}
+      onChange={(e) =>
+        setCantidadDetalle(e.target.value)
+      }
+      className="bg-[#111827] p-3 rounded-xl"
+    />
 
-  <input
-    value={monto}
-    onChange={(e) => setMonto(e.target.value)}
-    placeholder="$ 0.00"
-    className="bg-[#111827] border border-gray-700 rounded-xl p-4"
-  />
+    <input
+      placeholder="Precio"
+      value={precioDetalle}
+      onChange={(e) =>
+        setPrecioDetalle(e.target.value)
+      }
+      className="bg-[#111827] p-3 rounded-xl"
+    />
+
+    <button
+      onClick={agregarDetalle}
+      className="bg-cyan-500 hover:bg-cyan-600 rounded-xl"
+    >
+      Agregar
+    </button>
+
+  </div>
+  
+  {detalleVenta.length > 0 && (
+
+  <div className="mt-6">
+
+    <h4 className="font-bold mb-3">
+      Productos agregados
+    </h4>
+
+    <div className="space-y-2">
+
+      {detalleVenta.map((item, index) => (
+
+        <div
+          key={index}
+          className="grid grid-cols-4 gap-3 bg-[#111827] p-3 rounded-xl"
+        >
+
+          <div>{item.descripcion}</div>
+
+          <div>{item.cantidad}</div>
+
+          <div>${item.precio}</div>
+          
+          <button
+            onClick={() =>
+              setDetalleVenta(
+                detalleVenta.filter((_, i) => i !== index)
+              )
+           }
+            className="bg-red-500 hover:bg-red-600 rounded-lg px-2"
+         >
+           ❌
+         </button>
+
+        </div>
+
+      ))}
+
+    </div>
+
+  </div>
+
+)}
 
 </div>
 
-<div className="grid grid-cols-2 gap-4 mb-2">
+<div className="grid grid-cols-3 gap-4 mb-4">
 
-  <label className="text-sm text-gray-300">
+  {/* Total */}
+  <div>
+    <label className="block text-sm text-gray-300 mb-2">
+      Total
+    </label>
+
+    <div className="bg-[#111827] border border-cyan-500 rounded-xl p-4 font-bold text-cyan-400">
+      ${totalPedido || 0}
+    </div>
+  </div>
+
+  {/* Anticipo */}
+<div>
+  <label className="block text-sm text-gray-300 mb-2">
     Anticipo
   </label>
 
-  <label className="text-sm text-gray-300">
-    Saldo pendiente
-  </label>
-
-</div>
-
-<div className="grid grid-cols-2 gap-4 mb-4">
-
   <input
+    type="number"
     value={anticipo}
     onChange={(e) =>
-      setAnticipo(e.target.value)
+      setAnticipo(Number(e.target.value))
     }
-    placeholder="$ 0.00"
-    className="bg-[#111827] border border-gray-700 rounded-xl p-4"
+    className="w-full bg-[#111827] border border-gray-700 rounded-xl p-4"
+    placeholder="$0.00"
   />
+</div>
 
-  <input
-    value={`$${saldo}`}
-    readOnly
-    className="bg-[#0f172a] border border-cyan-700 rounded-xl p-4 text-cyan-400 font-bold"
-  />
+  {/* Saldo pendiente */}
+  <div>
+    <label className="block text-sm text-gray-300 mb-2">
+      Saldo pendiente
+    </label>
+
+    <div className="bg-[#111827] border border-cyan-500 rounded-xl p-4 font-bold text-cyan-400">
+  ${Math.max(0, totalPedido - anticipo)}
+</div>
+  </div>
 
 </div>
 
@@ -1178,7 +1412,13 @@ async function actualizarCosto(
 
   <div className="space-y-0">
 
-    {ventas.slice(0, 8).map((venta) => (
+    {ventas
+  .filter(
+    (venta) =>
+      venta.Estado_pedido !== "Entregado"
+  )
+  .slice(0, 8)
+  .map((venta) => (
 
      <div
   key={venta.id}
@@ -1204,21 +1444,37 @@ async function actualizarCosto(
   </div>
 
   <div>
-    <span
-      className={`px-4 py-2 rounded-full text-base font-bold ${
-        venta.Estado_pedido === "Diseño"
-          ? "bg-yellow-500/20 text-yellow-300"
-          : venta.Estado_pedido === "A imprenta"
-          ? "bg-cyan-500/20 text-cyan-300"
-          : venta.Estado_pedido === "Producción"
-          ? "bg-purple-500/20 text-purple-300"
-          : venta.Estado_pedido === "Terminado"
-          ? "bg-green-500/20 text-green-300"
-          : "bg-gray-500/20 text-gray-300"
-      }`}
-    >
-      {venta.Estado_pedido}
-    </span>
+   <span
+  className={`
+    px-4
+    py-2
+    rounded-full
+    font-semibold
+    text-white
+
+    ${
+      venta.Estado_pedido === "Diseño"
+        ? "bg-purple-500"
+        : venta.Estado_pedido === "Aprobado"
+        ? "bg-blue-500"
+        : venta.Estado_pedido === "A imprenta"
+        ? "bg-orange-500"
+        : venta.Estado_pedido === "En producción"
+        ? "bg-yellow-500 text-black"
+        : venta.Estado_pedido === "Acabados"
+        ? "bg-green-500"
+        : venta.Estado_pedido === "Por recoger"
+        ? "bg-pink-500"
+        : venta.Estado_pedido === "Listo"
+        ? "bg-cyan-500"
+        : venta.Estado_pedido === "Por hacer"
+        ? "bg-gray-500"
+        : "bg-gray-700"
+    }
+  `}
+>
+  {venta.Estado_pedido}
+</span> 
   </div>
 
   <div className="font-bold text-cyan-400">
@@ -1233,9 +1489,10 @@ async function actualizarCosto(
 
 </div>  
 </div>       
-</>
-        
+
+</>        
 )}
+
  {vista === "historial" && (
   <div>
     <h1 className="text-4xl font-bold mb-8">
