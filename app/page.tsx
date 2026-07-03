@@ -594,6 +594,31 @@ async function actualizarPaquete() {
 
 }
 
+async function eliminarPaquete(id: string) {
+
+  const confirmar = window.confirm(
+    "¿Seguro que deseas eliminar este paquete?"
+  )
+
+  if (!confirmar) return
+
+  const { error } = await supabase
+    .from("Paquetes_Producto")
+    .delete()
+    .eq("id", id)
+
+  if (error) {
+
+    alert(error.message)
+
+    return
+
+  }
+
+  await cargarDatos()
+
+}
+
 async function guardarProveedor() {
   const { error } = await supabase
     .from("Proveedores")
@@ -2657,10 +2682,12 @@ async function actualizarCosto(
 </button>
 
   <button
-    className="px-3 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-sm"
-  >
-    🗑 Eliminar
-  </button>
+  onClick={() => eliminarPaquete(paquete.id)}
+  className="px-3 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-sm"
+>
+  🗑 Eliminar
+</button>
+
 
 </div>
 
