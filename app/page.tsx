@@ -25,6 +25,7 @@ const [estadoPago, setEstadoPago] = useState("Pendiente")
 const [observaciones, setObservaciones] = useState("")
 const [vista, setVista] = useState("dashboard")
 const [ventas, setVentas] = useState<any[]>([])
+const [detalleVentas, setDetalleVentas] = useState<any[]>([])
 const [proveedores, setProveedores] = useState<any[]>([])
 const [nombreProveedor, setNombreProveedor] = useState("")
 const [telefonoProveedor, setTelefonoProveedor] = useState("")
@@ -132,6 +133,32 @@ const [pendientesTexto, setPendientesTexto] =
 const [pendienteId, setPendienteId] =
   useState<number | null>(null)
 
+const [mostrarNuevoPaquete, setMostrarNuevoPaquete] =
+  useState(false)
+
+const [nombrePaquete, setNombrePaquete] =
+  useState("")
+
+const [proveedorPaquete, setProveedorPaquete] =
+  useState("")
+
+const [cantidadPaquete, setCantidadPaquete] =
+  useState("")
+
+const [costoPaquete, setCostoPaquete] =
+  useState("")
+
+const [precioPublicoPaquete, setPrecioPublicoPaquete] =
+  useState("")
+
+const [observacionPaquete, setObservacionPaquete] =
+  useState("")
+
+const [paquetesProducto, setPaquetesProducto] =
+  useState<any[]>([])
+
+const [paqueteEditando, setPaqueteEditando] = useState<any>(null)
+
 useEffect(() => {
   cargarDatos()
   cargarPendientes()
@@ -160,13 +187,29 @@ async function cargarDatos() {
   .select("*")
   .order("Fecha", { ascending: false })
 
+  const { data: detalleVentasData } = await supabase
+  .from("Detalle_Ventas")
+  .select("*")
+
+  const {
+  data: paquetesProductoData,
+  error: paquetesProductoError
+} = await supabase
+  .from("Paquetes_Producto")
+  .select("*")
+
+console.log("PAQUETES:", paquetesProductoData)
+console.log("ERROR PAQUETES:", paquetesProductoError)
+
 console.log("VENTAS RECARGADAS:", ventasData)
 console.log("ERROR VENTAS:", ventasError)
 console.log("VENTAS:", ventasData)
 
   setClientes(clientesData || [])
   setProductos(productosData || [])
+  setPaquetesProducto(paquetesProductoData || [])
   setVentas(ventasData || [])
+  setDetalleVentas(detalleVentasData || [])
   setProveedores(proveedoresData || [])
   setGastos(gastosData || [])
 
@@ -191,6 +234,20 @@ const trabajosActivos = ventas.filter(
   (venta) => venta.Estado_pedido !== "Terminado"
 ).length
 
+async function cargarPaquetesProducto() {
+
+  const { data, error } = await supabase
+    .from("Paquetes_Producto")
+    .select("*")
+
+  if (error) {
+    console.log(error)
+    return
+  }
+
+  setPaquetesProducto(data || [])
+
+}
 
 async function guardarCliente(id: string) {
 
@@ -334,7 +391,7 @@ if (clienteSeleccionado === "nuevo") {
  console.log("ANTICIPO:", anticipo)
  console.log("DETALLE VENTA:", detalleVenta)
 
- const { error } = await supabase
+const { data: ventaCreada, error } = await supabase
   .from("Ventas")
   
     .insert([
@@ -358,6 +415,38 @@ if (clienteSeleccionado === "nuevo") {
       Observaciones: observaciones
       }
     ])
+    .select()
+    .single()
+    
+    console.log("ID DE LA VENTA:", ventaCreada.id)
+    console.log("VENTA CREADA:", ventaCreada)
+
+    const detalleGuardar = detalleVenta.map((item) => ({
+     Venta_id: ventaCreada.id,
+
+     Descripcion: item.descripcion,
+
+     Cantidad: Number(item.cantidad),
+
+     Precio: Number(item.precio),
+
+     Costo: 0,
+ 
+     Proveedor: item.proveedor || null,
+
+     Estado_produccion: "Por hacer"
+   }))
+
+console.log("DETALLE A GUARDAR:", detalleGuardar)
+const { error: errorDetalle } = await supabase
+  .from("Detalle_Ventas")
+  .insert(detalleGuardar)
+
+if (errorDetalle) {
+  alert(JSON.stringify(errorDetalle))
+  console.log(errorDetalle)
+  return
+}
 
   if (error) {
    alert(JSON.stringify(error))
@@ -393,6 +482,116 @@ function agregarDetalle() {
   setCantidadDetalle("")
   setPrecioDetalle("")
   setProveedorDetalle("")
+}
+
+async function guardarPaquete() {
+
+  if (!productoSeleccionado) {
+    alert("Selecciona un producto")
+    return
+  }
+
+  if (
+    !nombrePaquete ||
+    !proveedorPaquete ||
+    !costoPaquete ||
+    !precioPublicoPaquete
+  ) {
+    alert("Completa todos los campos obligatorios")
+    return
+  }
+
+  const { error } = await supabase
+    .from("Paquetes_Producto")
+    .insert([
+      {
+        Producto_id: productoSeleccionado.id,
+        Nombre_paquete: nombrePaquete,
+        Cantidad: Number(cantidadPaquete),
+        Proveedor: proveedorPaquete,
+        Costo: Number(costoPaquete),
+        Precio_publico: Number(precioPublicoPaquete),
+        Observaciones: observacionPaquete,
+        Activo: true
+      }
+    ])
+
+  if (error) {
+    alert(JSON.stringify(error))
+    console.log(error)
+    return
+  }
+  
+  alert("Paquete guardado correctamente")
+
+  await cargarDatos()
+
+  setMostrarNuevoPaquete(false)
+
+  setNombrePaquete("")
+  setCantidadPaquete("")
+  setProveedorPaquete("")
+  setCostoPaquete("")
+  setPrecioPublicoPaquete("")
+  setObservacionPaquete("")
+
+}
+
+function editarPaquete(paquete: any) {
+
+  setPaqueteEditando(paquete)
+
+  setNombrePaquete(paquete.Nombre_paquete)
+
+  setCantidadPaquete(String(paquete.Cantidad))
+
+  setProveedorPaquete(paquete.Proveedor)
+
+  setCostoPaquete(String(paquete.Costo))
+
+  setPrecioPublicoPaquete(String(paquete.Precio_publico))
+
+  setObservacionPaquete(paquete.Observaciones || "")
+
+  setMostrarNuevoPaquete(true)
+
+}
+
+async function actualizarPaquete() {
+
+  const { error } = await supabase
+    .from("Paquetes_Producto")
+    .update({
+
+      Nombre_paquete: nombrePaquete,
+
+      Cantidad: Number(cantidadPaquete),
+
+      Proveedor: proveedorPaquete,
+
+      Costo: Number(costoPaquete),
+
+      Precio_publico: Number(precioPublicoPaquete),
+
+      Observaciones: observacionPaquete
+
+    })
+    .eq("id", paqueteEditando.id)
+
+  if (error) {
+
+    alert(error.message)
+
+    return
+
+  }
+
+  await cargarDatos()
+
+  setMostrarNuevoPaquete(false)
+
+  setPaqueteEditando(null)
+
 }
 
 async function guardarProveedor() {
@@ -559,9 +758,9 @@ async function actualizarEstado(
 ) {
 
   const { error } = await supabase
-    .from("Ventas")
+    .from("Detalle_Ventas")
     .update({
-      Estado_pedido: nuevoEstado
+      Estado_produccion: nuevoEstado
     })
     .eq("id", id)
 
@@ -580,7 +779,7 @@ async function actualizarProveedorVenta(
 ) {
 
   const { error } = await supabase
-    .from("Ventas")
+    .from("Detalle_Ventas")
     .update({
       Proveedor: proveedor
     })
@@ -1412,16 +1611,20 @@ async function actualizarCosto(
 
   <div className="space-y-0">
 
-    {ventas
-  .filter(
-    (venta) =>
-      venta.Estado_pedido !== "Entregado"
-  )
-  .slice(0, 8)
-  .map((venta) => (
+  {detalleVentas
+    .slice(0, 8)
+    .map((detalle) => {
+
+     const venta = ventas.find(
+       (v) => v.id === detalle.Venta_id
+      )
+
+      if (!venta) return null
+ 
+      return (
 
      <div
-  key={venta.id}
+  key={detalle.id}
   className="grid grid-cols-4 items-center border-b border-gray-800 py-8"
 >
 
@@ -1439,7 +1642,7 @@ async function actualizarCosto(
 
   <div>
     <p className="font-bold text-lg">
-      {venta.Producto_nombre}
+      {detalle.Descripcion}
     </p>
   </div>
 
@@ -1478,20 +1681,23 @@ async function actualizarCosto(
   </div>
 
   <div className="font-bold text-cyan-400">
-  ${venta.Total}
+  ${detalle.Precio}
 </div>
 
 </div> 
 
-    ))}
+       )
+  })}
 
   </div>
 
-</div>  
-</div>       
+  </div> 
+
+  </div>       
 
 </>        
-)}
+  )
+  }
 
  {vista === "historial" && (
   <div>
@@ -1508,8 +1714,6 @@ async function actualizarCosto(
          <th className="p-4">Cliente</th>
          <th className="p-4">Giro</th>
          <th className="p-4">Producto</th>
-         <th className="p-4">Costo</th>
-         <th className="p-4">Utilidad</th>
          <th className="p-4">Total</th>
          <th className="p-4">Anticipo</th>
          <th className="p-4">Saldo</th>
@@ -1564,29 +1768,6 @@ async function actualizarCosto(
   {venta.Producto_nombre}
 </td>
 
-<td className="p-4">
-
-  <input
-    type="number"
-    defaultValue={venta.Costo || ""}
-    onBlur={(e) =>
-      actualizarCosto(
-        venta.id,
-        e.target.value
-      )
-    }
-    className="
-      bg-[#111827]
-      border
-      border-gray-700
-      rounded
-      px-2
-      py-1
-      w-24
-    "
-  />
-
-</td>
 
 <td className="p-4 text-green-400 font-bold">
 
@@ -1602,25 +1783,6 @@ async function actualizarCosto(
   ${venta.Total}
 </td>
 
-<td className="p-4">
-  {ventaEditando === venta.id ? (
-
-    <input
-      value={anticipoEditado}
-      onChange={(e) =>
-        setAnticipoEditado(e.target.value)
-      }
-      className="bg-[#111827] border border-gray-700 rounded px-2 py-1 w-24"
-    />
-
-  ) : (
-
-    <span className="text-cyan-400">
-      ${venta.Anticipo || 0}
-    </span>
-
-  )}
-</td>
 
 <td className="p-4 text-yellow-400">
   ${venta.Saldo || 0}
@@ -1769,21 +1931,44 @@ async function actualizarCosto(
         </thead>
 
         <tbody>
-          {ventas
-  .filter(
-    (venta) => venta.Estado_pedido !== "Entregado"
-  )
-  .map((venta) => (
+          {detalleVentas
+            .filter(
+              (detalle) =>
+                detalle.Estado_produccion !== "Entregado"
+           )
+           .map((detalle) => {
+
+              const venta = ventas.find(
+               (v) => v.id === detalle.Venta_id
+              )
+
+              if (!venta) return null
+
+              return (
       <tr
-              key={venta.id}
+              key={detalle.id}
               className="border-b border-gray-800"
             >
-              <td className="p-4">
-                {venta.Cliente_nombre}
-              </td>
+             <td className="p-4">
+              {
+                detalleVentas.findIndex(
+                (d) => d.id === detalle.id
+                ) === 0 ||
+
+                detalleVentas[
+                 detalleVentas.findIndex(
+                 (d) => d.id === detalle.id
+                  ) - 1
+                 ]?.Venta_id !== detalle.Venta_id
+
+                 ? venta.Cliente_nombre
+
+      : ""
+  }
+</td> 
 
               <td className="p-4">
-                {venta.Producto_nombre}
+                {detalle.Descripcion}
               </td>
 
               <td className="p-4 text-center">
@@ -1810,9 +1995,9 @@ async function actualizarCosto(
               {estadosProduccion.map((estado) => {
 
   const estadoActual =
-    estadosProduccion.indexOf(
-      venta.Estado_pedido
-    )
+   estadosProduccion.indexOf(
+    detalle.Estado_produccion
+  )
 
   const estadoCelda =
     estadosProduccion.indexOf(
@@ -1830,7 +2015,7 @@ async function actualizarCosto(
       <button
         onClick={() =>
           actualizarEstado(
-            venta.id,
+            detalle.id,
             estado
           )
         }
@@ -1880,10 +2065,10 @@ async function actualizarCosto(
               <td className="p-4">
 
   <select
-    value={venta.Proveedor || ""}
+    value={detalle.Proveedor || ""}
     onChange={(e) =>
       actualizarProveedorVenta(
-        venta.id,
+        detalle.id,
         e.target.value
       )
     }
@@ -1906,8 +2091,10 @@ async function actualizarCosto(
   </select>
 
 </td>
-            </tr>
-          ))}
+</tr>
+
+    )
+  })}
         </tbody>
       </table>
     </div>
@@ -2336,12 +2523,10 @@ async function actualizarCosto(
         <div
           key={producto.id}
           onClick={() => {
-
+            console.log(producto)
             setProductoSeleccionado(producto)
 
-            cargarProveedoresProducto(
-              producto.id
-            )
+            cargarProveedoresProducto(producto.id)
 
           }}
           className="p-3 rounded bg-[#1e293b] cursor-pointer hover:bg-gray-900"
@@ -2359,13 +2544,41 @@ async function actualizarCosto(
 
   <div className="bg-[#0f172a] p-6 rounded-xl">
 
-    <h2 className="text-2xl font-bold mb-4">
+   <div className="flex justify-between items-center mb-6">
 
-      {productoSeleccionado
-        ? `Proveedores de ${productoSeleccionado.Nombre}`
-        : "Selecciona un producto"}
+  <h2 className="text-2xl font-bold">
 
-    </h2>
+    {productoSeleccionado
+      ? productoSeleccionado.Nombre
+      : "Selecciona un producto"}
+
+  </h2>
+
+  <div className="bg-cyan-900/40 border border-cyan-600 rounded-full px-3 py-1 text-sm text-cyan-300">
+   {paquetesProducto.filter(
+    (p) => Number(p.Producto_id) === Number(productoSeleccionado?.id)
+   ).length} paquetes
+  </div>
+
+  {productoSeleccionado && (
+
+    <button
+      onClick={() => setMostrarNuevoPaquete(true)}
+      className="
+        bg-cyan-500
+        hover:bg-cyan-600
+        px-4
+        py-2
+        rounded-xl
+        font-semibold
+      "
+    >
+      ➕ Nuevo paquete
+    </button>
+
+  )}
+
+</div> 
 
     {productoSeleccionado && (
 
@@ -2373,94 +2586,302 @@ async function actualizarCosto(
 
         <div className="flex gap-2 mb-4">
 
-          <select
-            value={proveedorSeleccionado}
-            onChange={(e) =>
-              setProveedorSeleccionado(
-                e.target.value
-              )
-            }
-            className="bg-black border border-gray-700 p-2 rounded flex-1"
-          >
-
-            <option value="">
-              Seleccionar proveedor
-            </option>
-
-            {proveedores.map((p) => (
-
-              <option
-                key={p.id}
-                value={p.id}
-              >
-                {p.Nombre}
-              </option>
-
-            ))}
-
-          </select>
-
-          <input
-            type="number"
-            value={nuevoPrecio}
-            onChange={(e) =>
-              setNuevoPrecio(e.target.value)
-            }
-            placeholder="Precio"
-            className="bg-black border border-gray-700 p-2 rounded w-32"
-          />
           
-          <input
-           value={nuevaObservacion}
-           onChange={(e) =>
-             setNuevaObservacion(e.target.value)
-           }
-            placeholder="Observación"
-           className="bg-[#111827] border border-gray-700 rounded-xl p-3"
-          />
-
-          <button
-            onClick={agregarProveedorProducto}
-            className="bg-green-600 px-4 rounded"
-          >
-            +
-          </button>
-
         </div>
+  
+  <div className="grid grid-cols-2 gap-4 mt-6">
 
-        <div className="space-y-2">
+    {paquetesProducto
+   .filter(
+    (paquete) =>
+      Number(paquete.Producto_id) === Number(productoSeleccionado.id)
+   )
+   .map((paquete) => (
 
-          {proveedoresProducto.map((item) => (
+      <div
+  key={paquete.id}
+  className="bg-[#111827] border border-gray-700 rounded-xl p-4 hover:border-cyan-500 transition"
+>
 
-            <div
-              key={item.id}
-              className="bg-black p-3 rounded flex justify-between"
-            >
+  <h3 className="font-bold text-lg">
+    📦 {paquete.Nombre_paquete}
+  </h3>
 
-              <span>
-                {item.Proveedor_id}
-              </span>
+  <p className="text-gray-400 text-sm mt-1">
+    {paquete.Proveedor}
+  </p>
 
-              <span>
-                ${item.Precio}
-              </span>
+  <div className="flex justify-between mt-4">
 
-              <div className="text-gray-400 text-sm mt-2">
-               {item.Observacion}
-            </div>
-            </div>
+    <div>
 
-          ))}
+      <p className="text-xs text-gray-500">
+        Costo
+      </p>
 
-        </div>
+      <p className="text-red-400 font-bold">
+        ${paquete.Costo}
+      </p>
 
-      </>
+    </div>
+
+    <div className="text-right">
+
+      <p className="text-xs text-gray-500">
+        Precio a público
+      </p>
+
+      <p className="text-green-400 font-bold">
+        ${paquete.Precio_publico}
+      </p>
+
+    </div>
+
+  </div>
+
+  <div className="border-t border-gray-700 mt-4 pt-3">
+
+    <p className="text-sm whitespace-pre-line">
+      {paquete.Observaciones}
+    </p>
+
+  </div>
+   
+   <div className="flex justify-end gap-2 mt-4">
+
+  <button
+  onClick={() => editarPaquete(paquete)}
+  className="px-3 py-1 rounded-lg bg-cyan-600 hover:bg-cyan-700 text-sm"
+>
+  ✏️ Editar
+</button>
+
+  <button
+    className="px-3 py-1 rounded-lg bg-red-600 hover:bg-red-700 text-sm"
+  >
+    🗑 Eliminar
+  </button>
+
+</div>
+
+</div>
+
+    ))}
+
+</div>
+
+</>
+
 
     )}
 
   </div>
 
 </div>
+
+)}
+
+{mostrarNuevoPaquete && (
+
+  <div
+    className="
+      fixed
+      inset-0
+      bg-black/70
+      flex
+      items-center
+      justify-center
+      z-50
+    "
+  >
+
+    <div
+      className="
+        bg-[#0f172a]
+        w-[700px]
+        rounded-2xl
+        p-8
+        border
+        border-gray-700
+      "
+    >
+
+      <div className="flex justify-between items-center mb-6">
+
+        <h2 className="text-2xl font-bold">
+          📦 Nuevo paquete
+        </h2>
+
+        <button
+          onClick={() =>
+            setMostrarNuevoPaquete(false)
+          }
+          className="text-2xl"
+        >
+          ✖
+        </button>
+
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+
+        <div>
+
+          <label className="text-sm text-gray-400">
+            Nombre del paquete
+          </label>
+
+          <input
+            value={nombrePaquete}
+            onChange={(e) =>
+              setNombrePaquete(e.target.value)
+            }
+            placeholder="Ej. 500 tarjetas una cara"
+            className="w-full bg-[#111827] rounded-xl p-3 mt-2"
+          />
+
+        </div>
+
+        <div>
+
+          <label className="text-sm text-gray-400">
+            Cantidad
+          </label>
+
+          <input
+            value={cantidadPaquete}
+            onChange={(e) =>
+              setCantidadPaquete(e.target.value)
+            }
+            placeholder="500"
+            className="w-full bg-[#111827] rounded-xl p-3 mt-2"
+          />
+
+        </div>
+
+        <div>
+
+          <label className="text-sm text-gray-400">
+            Proveedor
+          </label>
+          
+          <select
+            value={proveedorPaquete}
+            onChange={(e) =>
+              setProveedorPaquete(e.target.value)
+            }
+            className="w-full bg-[#111827] rounded-xl p-3 mt-2"
+          >
+
+            <option value="">
+              Seleccionar proveedor
+            </option>
+
+            {proveedores.map((proveedor) => (
+
+              <option
+                key={proveedor.id}
+                value={proveedor.Nombre}
+              >
+                {proveedor.Nombre}
+              </option>
+
+            ))}
+
+          </select>
+
+        </div>
+
+        <div>
+
+          <label className="text-sm text-gray-400">
+            Costo
+          </label>
+
+          <input
+            value={costoPaquete}
+            onChange={(e) =>
+              setCostoPaquete(e.target.value)
+            }
+            placeholder="$120"
+            className="w-full bg-[#111827] rounded-xl p-3 mt-2"
+          />
+
+        </div>
+
+        <div>
+
+          <label className="text-sm text-gray-400">
+            Precio público
+          </label>
+
+          <input
+            value={precioPublicoPaquete}
+            onChange={(e) =>
+              setPrecioPublicoPaquete(e.target.value)
+            }
+            placeholder="$550"
+            className="w-full bg-[#111827] rounded-xl p-3 mt-2"
+          />
+
+        </div>
+
+      </div>
+
+      <div className="mt-5">
+
+        <label className="text-sm text-gray-400">
+          Observaciones
+        </label>
+
+        <textarea
+          value={observacionPaquete}
+          onChange={(e) =>
+            setObservacionPaquete(e.target.value)
+          }
+          placeholder="Papel couche 300 g, impresión una cara..."
+          className="w-full bg-[#111827] rounded-xl p-3 mt-2 h-28"
+        />
+
+      </div>
+
+      <div className="flex justify-end gap-3 mt-6">
+
+        <button
+          onClick={() =>
+            setMostrarNuevoPaquete(false)
+          }
+          className="bg-gray-700 px-5 py-2 rounded-xl"
+        >
+          Cancelar
+        </button>
+
+        <button
+         onClick={() => {
+
+  if (paqueteEditando) {
+
+    actualizarPaquete()
+
+  } else {
+
+    guardarPaquete()
+
+  }
+
+}}
+          className="bg-cyan-500 hover:bg-cyan-600 px-5 py-2 rounded-xl font-semibold"
+        >
+          {paqueteEditando
+          ? "💾 Guardar cambios"
+          : "💾 Guardar paquete"}
+        </button>
+
+      </div>
+
+    </div>
+
+  </div>
 
 )}
 
