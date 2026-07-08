@@ -17,7 +17,8 @@ const [clientes, setClientes] = useState<any[]>([])
 const [productos, setProductos] = useState<any[]>([])
 const [clienteSeleccionado, setClienteSeleccionado] = useState("")
 const [productoSeleccionado, setProductoSeleccionado] = useState<any>(null)
-const [fechaVenta, setFechaVenta] = useState("")
+const [fechaVenta, setFechaVenta] = useState(
+  new Date().toISOString().split("T")[0])
 const [monto, setMonto] = useState("")
 const [requiereFactura, setRequiereFactura] = useState(false)
 const [tipoCliente, setTipoCliente] = useState("NV")
@@ -38,7 +39,7 @@ const [nombreCliente, setNombreCliente] = useState("")
 const [telefonoCliente, setTelefonoCliente] = useState("")
 const [ventaEditando, setVentaEditando] =
   useState<string | null>(null)
-  const [anticipoEditado, setAnticipoEditado] =
+const [anticipoEditado, setAnticipoEditado] =
   useState("")
 const [estadoPagoEditado, setEstadoPagoEditado] =
   useState("Pendiente")
@@ -354,7 +355,8 @@ if (clienteSeleccionado === "nuevo") {
       .insert([
         {
           Nombre: nombreCliente,
-          Telefono: telefonoCliente
+          Telefono: telefonoCliente,
+          Tipo_cliente: tipoCliente
         }
       ])
       .select()
@@ -390,7 +392,8 @@ if (clienteSeleccionado === "nuevo") {
  console.log("TOTAL PEDIDO:", totalPedido)
  console.log("ANTICIPO:", anticipo)
  console.log("DETALLE VENTA:", detalleVenta)
-
+console.log("TIPO CLIENTE SELECCIONADO:", tipoCliente)
+console.log("FECHA SELECCIONADA:", fechaVenta)
 const { data: ventaCreada, error } = await supabase
   .from("Ventas")
   
@@ -408,6 +411,8 @@ const { data: ventaCreada, error } = await supabase
 
       Estado_pago: estadoPago,
       Estado_pedido: "Por hacer",
+
+      Fecha: fechaVenta,
 
       Tipo_cliente: tipoCliente,
       Requiere_factura: requiereFactura,
@@ -1795,19 +1800,29 @@ async function actualizarCosto(
 
 
 <td className="p-4 text-green-400 font-bold">
-
-  ${
-    (Number(venta.Total) || 0)
-    -
-    (Number(venta.Costo) || 0)
-  }
-
-</td>
-
-<td className="p-4">
   ${venta.Total}
 </td>
 
+<td className="p-4">
+
+  {ventaEditando === venta.id ? (
+
+    <input
+      type="number"
+      value={anticipoEditado}
+      onChange={(e) =>
+        setAnticipoEditado(e.target.value)
+      }
+      className="bg-[#111827] border border-gray-700 rounded px-2 py-1 w-24"
+    />
+
+  ) : (
+
+    `$${venta.Anticipo}`
+
+  )}
+
+</td>
 
 <td className="p-4 text-yellow-400">
   ${venta.Saldo || 0}
