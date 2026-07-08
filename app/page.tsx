@@ -373,8 +373,8 @@ if (clienteSeleccionado === "nuevo") {
 } else {
 
   const cliente = clientes.find(
-    (c) => c.id === Number(clienteSeleccionado)
-  )
+  (c) => String(c.id) === String(clienteSeleccionado)
+)
 
   clienteNombre = cliente?.Nombre || ""
 }
@@ -394,6 +394,8 @@ if (clienteSeleccionado === "nuevo") {
  console.log("DETALLE VENTA:", detalleVenta)
 console.log("TIPO CLIENTE SELECCIONADO:", tipoCliente)
 console.log("FECHA SELECCIONADA:", fechaVenta)
+console.log("Cliente ID:", clienteId);
+console.log("Cliente Nombre:", clienteNombre);
 const { data: ventaCreada, error } = await supabase
   .from("Ventas")
   
@@ -1303,9 +1305,27 @@ async function actualizarCosto(
 
     <select
       value={clienteSeleccionado}
-      onChange={(e) =>
-        setClienteSeleccionado(e.target.value)
-      }
+     onChange={(e) => {
+  const id = e.target.value;
+
+  setClienteSeleccionado(id);
+
+  if (id !== "nuevo" && id !== "") {
+    const cliente = clientes.find(
+      (c) => String(c.id) === id
+    );
+
+    if (cliente) {
+      setNombreCliente(cliente.Nombre || "");
+      setTelefonoCliente(cliente.Telefono || "");
+      setTipoCliente(cliente.Tipo_cliente || "NV");
+    }
+  } else {
+    setNombreCliente("");
+    setTelefonoCliente("");
+    setTipoCliente("NV");
+  }
+}}
       className="w-full bg-[#111827] border border-gray-700 rounded-xl p-4"
     >
       <option value="">
@@ -1788,7 +1808,9 @@ async function actualizarCosto(
 
   ) : (
 
-    venta.Giro
+    clientes.find(
+    (c) => String(c.id) === String(venta.Cliente_id)
+  )?.Giro || ""
 
   )}
 
