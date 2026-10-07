@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect } from "react"
+import { Fragment, useState, useEffect } from "react"
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -217,12 +217,41 @@ console.log("VENTAS:", ventasData)
   console.log("VENTAS GUARDADAS EN STATE:", ventasData)
   
 }
-const ventasDelMes = ventas.reduce(
+const ahora = new Date()
+const mesActual = ahora.getMonth()
+const añoActual = ahora.getFullYear()
+
+const ventasDelMesActual = ventas.filter((venta) => {
+  const fecha = new Date(venta.Fecha)
+
+  return (
+    fecha.getMonth() === mesActual &&
+    fecha.getFullYear() === añoActual
+  )
+})
+
+const ventasDelMes = ventasDelMesActual.reduce(
   (acc, venta) => acc + Number(venta.Total || 0),
   0
 )
 
-const pedidosDelMes = ventas.length
+const pedidosDelMes = ventasDelMesActual.length
+
+const ventasPorMes: Record<string, typeof ventas> = {}
+
+ventas.forEach((venta) => {
+  const fecha = new Date(venta.Fecha)
+
+  const clave = `${fecha.getFullYear()}-${String(
+    fecha.getMonth() + 1
+  ).padStart(2, "0")}`
+
+  if (!ventasPorMes[clave]) {
+    ventasPorMes[clave] = []
+  }
+
+  ventasPorMes[clave].push(venta)
+})
 
 const cobradoDelMes = ventas
   .filter((venta) => venta.Estado_pago === "Pagado")
@@ -1661,9 +1690,16 @@ async function actualizarCosto(
 
   <div className="space-y-0">
 
-  {detalleVentas
-    .slice(0, 8)
-    .map((detalle) => {
+   {detalleVentas
+  .filter((detalle) => {
+    const venta = ventas.find(
+      (v) => v.id === detalle.Venta_id
+    )
+
+    return venta && detalle.Estado_produccion !== "Entregado"
+  })
+  .slice(0, 8)
+  .map((detalle) => {
 
      const venta = ventas.find(
        (v) => v.id === detalle.Venta_id
@@ -1774,7 +1810,27 @@ async function actualizarCosto(
         </thead>
 
         <tbody>
-          {ventas.map((venta) => (
+          {Object.entries(ventasPorMes)
+           .sort(([a], [b]) => b.localeCompare(a))
+           .map(([mes, ventasDelMes]) => (
+           <Fragment key={mes}>
+            <tr>
+              <td
+               colSpan={11}
+               className="p-4 text-xl font-bold text-blue-400 uppercase border-b border-gray-700"
+              >
+                {new Date(`${mes}-01T00:00:00`).toLocaleDateString(
+                   "es-MX",
+                   {
+                     month: "long",
+                     year: "numeric",
+                    }
+                 )}
+             </td>
+          </tr>
+
+       {ventasDelMes.map((venta) => (
+
             <tr
               key={venta.id}
               className="border-b border-gray-800"
@@ -1786,6 +1842,7 @@ async function actualizarCosto(
               </td>
 
               <td className="p-4">
+
   {venta.Tipo_cliente}
 </td>
 
@@ -1959,9 +2016,11 @@ async function actualizarCosto(
 
 </td>
 
-            </tr>
-          ))}
-        </tbody>
+           </tr>
+))}
+</Fragment>
+))}
+</tbody>
       </table>
     </div>
   </div>
